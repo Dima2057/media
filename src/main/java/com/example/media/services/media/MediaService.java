@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface MediaService {
 
-    void uploadImage(MultipartFile file) throws IOException;
+    AwsImage uploadImage(MultipartFile file) throws IOException;
 
     List<AwsImage> listImages();
 

@@ -1,11 +1,10 @@
-FROM openjdk:17-alpine3.14
+FROM eclipse-temurin:17-jdk-jammy
 
 WORKDIR /app
 
 COPY .mvn/ .mvn
-COPY pom.xml mvnw ./
-
-RUN ./mvnw dependency:go-offline
+COPY mvnw pom.xml ./
+RUN ./mvnw dependency:resolve
 
 COPY src ./src
 

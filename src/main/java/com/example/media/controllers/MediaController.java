@@ -4,7 +4,6 @@ import com.example.media.models.aws.AwsImage;
 import com.example.media.services.media.MediaService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,17 +26,16 @@ public class MediaController {
     @GetMapping("/images")
     public List<AwsImage> listImages(@RequestParam(value = "label", required = false) String label) {
         if (label == null) {
-            log.debug("starting listAllImages");
+            log.info("starting listAllImages");
             return this.mediaService.listImages();
         }
-        log.debug("starting listSearchImages");
+        log.info("starting listSearchImages");
         return this.mediaService.listImagesByLabel(label);
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<String> uploadImage(@RequestParam("imageFile") MultipartFile file) throws IOException {
-        this.mediaService.uploadImage(file);
-        return ResponseEntity.ok().build();
+    public AwsImage uploadImage(@RequestParam("imageFile") MultipartFile file) throws IOException {
+        return this.mediaService.uploadImage(file);
     }
 
 }

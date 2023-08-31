@@ -24,6 +24,7 @@ public class AwsConfig {
     private String awsSecretKey;
 
     public AWSCredentials credentials() {
+//        String secretKey = System.getenv("AWS_SECRET_KEY");
         return new BasicAWSCredentials(
                 this.awsAccessKey,
                 this.awsSecretKey

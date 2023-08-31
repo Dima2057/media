@@ -6,10 +6,7 @@ import com.amazonaws.services.rekognition.model.DetectLabelsResult;
 import com.amazonaws.services.rekognition.model.Image;
 import com.amazonaws.services.rekognition.model.Label;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.S3ObjectInputStream;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.*;
 import com.example.media.models.aws.AwsImage;
 import com.example.media.services.media.MediaService;
 import lombok.extern.slf4j.Slf4j;
@@ -46,23 +43,30 @@ public class AwsMediaService implements MediaService {
     }
 
     @Override
-    public void uploadImage(MultipartFile multipartFile) throws IOException {
+    public AwsImage uploadImage(MultipartFile multipartFile) throws IOException {
+        log.info("uploadImage started");
         File file = this.convertMultiPartToFile(multipartFile);
-        log.info("file: {}", file);
         amazonS3Client.putObject(new PutObjectRequest(this.awsBucketName, file.getName(), file));
-        log.info("uploadImages started");
-    }
-
-    private File convertMultiPartToFile(MultipartFile file ) throws IOException {
-        File convFile = new File(file.getOriginalFilename());
-        FileOutputStream fos = new FileOutputStream(convFile);
-        fos.write(file.getBytes());
-        fos.close();
-        return convFile;
+        log.info("uploadImage finished");
+        GetObjectRequest request = new GetObjectRequest(this.awsBucketName, file.getName());
+        Optional<S3ObjectSummary> objectSummary = this.amazonS3Client
+                .listObjects(this.awsBucketName)
+                .getObjectSummaries()
+                .stream()
+                .filter(obj -> obj.getKey().equals(request.getKey()))
+                .findFirst();
+        log.info("objectSummary: {}", objectSummary);
+        return objectSummary.map(s3ObjectSummary -> new AwsImage(
+                this.getImagePublicUrl(s3ObjectSummary.getKey()),
+                s3ObjectSummary.getKey(),
+                s3ObjectSummary.getLastModified(),
+                s3ObjectSummary.getSize()
+        )).orElse(null);
     }
 
     @Override
     public List<AwsImage> listImages() {
+        log.info("getting listImages");
         return amazonS3Client.listObjects(this.awsBucketName)
                 .getObjectSummaries()
                 .stream()
@@ -88,8 +92,6 @@ public class AwsMediaService implements MediaService {
                 .stream()
                 .map(S3ObjectSummary::getKey)
                 .toList();
-
-        System.out.println("objectSummaries: " + objectSummaries);
 
         for (String objectKey : objectKeys) {
             S3Object s3Object = this.amazonS3Client.getObject(this.awsBucketName, objectKey);
@@ -117,17 +119,18 @@ public class AwsMediaService implements MediaService {
 
             List<Label> labels = result.getLabels();
             for (Label label : labels) {
-                if (label.getName().equals(searchLabel)) {
-                    objectSummary.ifPresent(s3ObjectSummary -> images.add(new AwsImage(
-                            this.getImagePublicUrl(s3ObjectSummary.getKey()),
-                            s3ObjectSummary.getKey(),
-                            s3ObjectSummary.getLastModified(),
-                            s3ObjectSummary.getSize()
-                    )));
-                    System.out.println("objectSummary: " + objectSummary);
-                    System.out.println("result: " + result);
-                    System.out.println("Label: " + label.getName());
-                    System.out.println("Confidence: " + label.getConfidence());
+                String searchLabelFormatted = this.formatSearchLabel(searchLabel);
+                if (label.getName().equals(searchLabelFormatted)) {
+                    objectSummary.ifPresent(s3ObjectSummary ->
+                            images.add(new AwsImage(
+                                            this.getImagePublicUrl(s3ObjectSummary.getKey()),
+                                            s3ObjectSummary.getKey(),
+                                            s3ObjectSummary.getLastModified(),
+                                            s3ObjectSummary.getSize()
+                                    )
+                            ));
+                    log.info("Label: {}", label.getName());
+                    log.info("Confidence: {}", label.getConfidence());
                 }
             }
 
@@ -142,5 +145,18 @@ public class AwsMediaService implements MediaService {
 
     private String getImagePublicUrl(String imageName) {
         return awsS3Url + imageName;
+    }
+
+    private File convertMultiPartToFile(MultipartFile file) throws IOException {
+        File convFile = new File(file.getOriginalFilename());
+        FileOutputStream fos = new FileOutputStream(convFile);
+        fos.write(file.getBytes());
+        fos.close();
+        return convFile;
+    }
+
+    private String formatSearchLabel(String searchLabel) {
+        searchLabel = searchLabel.toLowerCase();
+        return searchLabel.substring(0, 1).toUpperCase() + searchLabel.substring(1);
     }
 }
